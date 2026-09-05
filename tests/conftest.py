@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from lib.sql_generator.config import get_settings
+from agents.common.config import get_settings
 
 
 @pytest.fixture(autouse=True)

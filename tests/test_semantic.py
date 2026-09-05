@@ -4,8 +4,8 @@ from typing import Any, cast
 
 import pytest
 
-from lib.sql_generator.db import OracleConnection
-from lib.sql_generator.semantic import _MAX_FORMATTED_CHARS, SemanticContext
+from agents.common.db import OracleConnection
+from agents.common.semantic import _MAX_FORMATTED_CHARS, SemanticContext
 
 
 class _FakeConnection:

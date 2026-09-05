@@ -2,8 +2,8 @@
 
 import pytest
 
-from lib.sql_generator.db import DatabaseError, OracleConnection
-from lib.sql_generator.validator import is_read_only, sanitize_sql, validate_sql
+from agents.common.db import DatabaseError, OracleConnection
+from agents.sql_generator.validator import is_read_only, sanitize_sql, validate_sql
 
 
 class _FakeConnection:

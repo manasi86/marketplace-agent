@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from lib.sql_generator.logging_setup import _NOISY_LOGGERS, _ConsoleHandler, configure_logging
+from agents.common.logging_setup import _NOISY_LOGGERS, _ConsoleHandler, configure_logging
 
 
 def _console_handlers() -> list[_ConsoleHandler]:

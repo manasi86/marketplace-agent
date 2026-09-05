@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from lib.sql_generator.prompts import (
+from agents.sql_generator.prompts import (
     _render_entities,
     intent_prompt,
     sql_generation_prompt,

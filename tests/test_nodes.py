@@ -3,11 +3,11 @@
 from datetime import date
 from typing import Any, cast
 
-from lib.sql_generator.config import Settings
-from lib.sql_generator.db import QueryResult
-from lib.sql_generator.nodes import _parse_intent_json, build_nodes
-from lib.sql_generator.semantic import SemanticContext
-from lib.sql_generator.state import AgentState, initial_state
+from agents.common.config import Settings
+from agents.common.db import QueryResult
+from agents.common.semantic import SemanticContext
+from agents.sql_generator.nodes import _parse_intent_json, build_nodes
+from agents.sql_generator.state import SqlGeneratorState, initial_state
 from tests.doubles import FakeLLM, FakeOracle, make_context
 
 INTENT_JSON = (
@@ -31,7 +31,7 @@ SAMPLE_SCHEMA: dict[str, Any] = {
 }
 
 
-def _node_state(**overrides: Any) -> AgentState:
+def _node_state(**overrides: Any) -> SqlGeneratorState:
     state = initial_state("Show sales", 3)
     state.update(cast(Any, overrides))
     return state

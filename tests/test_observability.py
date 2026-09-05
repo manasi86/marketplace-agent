@@ -5,14 +5,9 @@ from typing import Any
 
 import pytest
 
-from lib.sql_generator import observability
-from lib.sql_generator.config import Settings, get_settings
-from lib.sql_generator.observability import (
-    _ensure_env,
-    observe_run,
-    observe_step,
-    tracing_configured,
-)
+from agents.common import observability
+from agents.common.config import Settings, get_settings
+from agents.common.observability import _ensure_env, observe_run, observe_step, tracing_configured
 
 
 def _add(a: int, b: int) -> int:
@@ -68,7 +63,7 @@ def test_observe_decorators_enable_tracing(
         recorded.append((name or "", as_type or ""))
         return lambda func: func
 
-    monkeypatch.setattr("lib.sql_generator.observability.langfuse_observe", fake_observe)
+    monkeypatch.setattr("agents.common.observability.langfuse_observe", fake_observe)
     _enable_langfuse_env(monkeypatch)
     decorated = factory("my_step")(_add)
     assert decorated(3, 4) == 7

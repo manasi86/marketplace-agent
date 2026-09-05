@@ -4,11 +4,11 @@ from typing import Any, cast
 
 from langchain_core.language_models import LanguageModelLike
 
-from lib.sql_generator.config import Settings
-from lib.sql_generator.context import AgentContext
-from lib.sql_generator.db import DatabaseError, OracleConnection, QueryResult
-from lib.sql_generator.llm import LLMError
-from lib.sql_generator.semantic import SemanticContext
+from agents.common.config import Settings
+from agents.common.context import AgentContext
+from agents.common.db import DatabaseError, OracleConnection, QueryResult
+from agents.common.llm import LLMError
+from agents.common.semantic import SemanticContext
 
 
 class FakeLLM:

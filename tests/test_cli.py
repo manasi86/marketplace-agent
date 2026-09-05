@@ -2,10 +2,10 @@
 
 import pytest
 
-from lib.sql_generator import cli
-from lib.sql_generator.config import Settings
-from lib.sql_generator.db import QueryResult
-from lib.sql_generator.llm import LLMError
+from agents.common.config import Settings
+from agents.common.db import QueryResult
+from agents.common.llm import LLMError
+from agents.sql_generator import cli
 from tests.doubles import FakeLLM, FakeOracle, make_context
 
 _QUERY = "Show total sales by region"
@@ -95,6 +95,6 @@ def test_main_error_path(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_main_module_is_importable() -> None:
-    import lib.sql_generator.__main__ as main_module
+    import agents.sql_generator.__main__ as main_module
 
     assert main_module is not None

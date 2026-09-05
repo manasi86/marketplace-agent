@@ -3,8 +3,8 @@
 from langchain_openai import ChatOpenAI
 import pytest
 
-from lib.sql_generator.config import Settings
-from lib.sql_generator.llm import LLMError, get_llm, invoke_llm
+from agents.common.config import Settings
+from agents.common.llm import LLMError, get_llm, invoke_llm
 
 
 class _MessageLike:
