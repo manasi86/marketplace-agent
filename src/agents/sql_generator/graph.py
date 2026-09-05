@@ -13,7 +13,6 @@ from agents.sql_generator.state import SqlGeneratorState, initial_state
 logger = logging.getLogger(__name__)
 
 NODE_NAMES = (
-    "understand_intent",
     "check_db_connection",
     "discover_semantic_layer",
     "generate_sql",
@@ -31,8 +30,7 @@ def build_graph(context: AgentContext) -> Any:
             name, observe_step(name)(log_step(name)(nodes[name]))
         )
 
-    graph.set_entry_point("understand_intent")
-    graph.add_edge("understand_intent", "check_db_connection")
+    graph.set_entry_point("check_db_connection")
     graph.add_conditional_edges(
         "check_db_connection",
         _route_after_connection,

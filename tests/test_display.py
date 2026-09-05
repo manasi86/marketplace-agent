@@ -7,6 +7,7 @@ from rich.console import Console
 
 from agents.common.display import (
     Results,
+    build_answer_panel,
     build_failure_panel,
     build_log_panels,
     build_result_table,
@@ -17,7 +18,7 @@ from agents.sql_generator.display import build_results
 from agents.sql_generator.display import print_agent_output as sql_print
 from agents.sql_generator.state import SqlGeneratorState, initial_state
 
-NODE_TITLES = {"understand_intent": "1. Understand Intent", "generate_sql": "4. Generate SQL"}
+NODE_TITLES = {"generate_sql": "3. Generate SQL", "validate_sql": "4. Validate SQL"}
 
 
 def _state(**overrides: Any) -> SqlGeneratorState:
@@ -34,13 +35,13 @@ def _console() -> tuple[io.StringIO, Console]:
 def test_build_log_panels_groups_by_node() -> None:
     state = _state(
         logs=[
-            ("understand_intent", "first log"),
-            ("generate_sql", "second log"),
-            ("understand_intent", "third log"),
+            ("generate_sql", "first log"),
+            ("validate_sql", "second log"),
+            ("generate_sql", "third log"),
         ]
     )
     panels = build_log_panels(state, NODE_TITLES)
-    assert [panel.title for panel in panels] == ["1. Understand Intent", "4. Generate SQL"]
+    assert [panel.title for panel in panels] == ["3. Generate SQL", "4. Validate SQL"]
     assert "first log" in str(panels[0].renderable)
     assert "third log" in str(panels[0].renderable)
     assert "second log" not in str(panels[0].renderable)
@@ -59,6 +60,12 @@ def test_build_log_panels_empty_logs() -> None:
 def test_build_failure_panel() -> None:
     rendered = str(build_failure_panel("ORA-00942: table does not exist").renderable)
     assert "ORA-00942" in rendered
+
+
+def test_build_answer_panel() -> None:
+    panel = build_answer_panel("  Total sales were 100 units.  ")
+    assert panel.title == "Answer"
+    assert "Total sales were 100 units." in str(panel.renderable)
 
 
 def test_build_result_table_columns_rows_and_caption() -> None:
@@ -104,7 +111,7 @@ def test_build_result_table_empty_result() -> None:
 
 
 def test_print_agent_output_success() -> None:
-    state = _state(logs=[("understand_intent", "step one")])
+    state = _state(logs=[("generate_sql", "step one")])
     buffer, console = _console()
     print_agent_output(
         state,
@@ -113,10 +120,26 @@ def test_print_agent_output_success() -> None:
         console=console,
     )
     output = buffer.getvalue()
-    assert "1. Understand Intent" in output
+    assert "3. Generate SQL" in output
     assert "step one" in output
     assert "West" in output
     assert "REGION" in output
+
+
+def test_print_agent_output_with_answer() -> None:
+    state = _state()
+    buffer, console = _console()
+    print_agent_output(
+        state,
+        node_titles=NODE_TITLES,
+        results=Results(columns=["REGION"], rows=[["West"]], execution_time_ms=5.0),
+        answer="Total sales for the West region were 100 units.",
+        console=console,
+    )
+    output = buffer.getvalue()
+    assert "Answer" in output
+    assert "Total sales for the West region were 100 units." in output
+    assert "West" in output
 
 
 def test_print_agent_output_failure() -> None:
@@ -167,13 +190,13 @@ def test_sql_print_agent_output_uses_titles() -> None:
     state = _state(
         query_columns=["REGION"],
         query_rows=[["West"]],
-        logs=[("understand_intent", "step one")],
+        logs=[("generate_sql", "step one")],
         execution_time_ms=5.0,
     )
     buffer, console = _console()
     sql_print(state, console)
     output = buffer.getvalue()
-    assert SQL_NODE_TITLES["understand_intent"] in output
+    assert SQL_NODE_TITLES["generate_sql"] in output
     assert "REGION" in output
     assert "West" in output
 

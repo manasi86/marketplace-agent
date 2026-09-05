@@ -5,8 +5,8 @@ import argparse
 from agents.common.agent_cli import build_parser, run_agent_cli
 from agents.common.config import get_settings
 from agents.common.context import build_context
+from agents.retrieve.display import print_agent_output
 from agents.retrieve.graph import run_agent
-from agents.sql_generator.display import print_agent_output
 
 _DESCRIPTION = (
     "Return factual data for a natural-language question by running the "

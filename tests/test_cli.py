@@ -10,7 +10,6 @@ from tests.doubles import FakeLLM, FakeOracle, make_context
 
 _QUERY = "Show total sales by region"
 
-INTENT_JSON = '{"intent": "aggregate sales", "entities": {}, "schema_hint": "SALES"}'
 GOOD_SQL = "SELECT region, SUM(total) FROM SALES.VW_SALES_SUMMARY GROUP BY region"
 
 
@@ -77,7 +76,7 @@ def test_main_llm_construct_error(
 def test_main_success(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     monkeypatch.setattr(cli, "get_settings", lambda: _settings())
     context = make_context(
-        llm=FakeLLM([INTENT_JSON, GOOD_SQL]),
+        llm=FakeLLM([GOOD_SQL]),
         connection=FakeOracle(result=QueryResult(columns=["REGION"], rows=[["West", 100]])),
     )
     monkeypatch.setattr(cli, "build_context", lambda settings: context)

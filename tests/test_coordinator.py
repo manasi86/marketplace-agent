@@ -14,6 +14,7 @@ from tests.doubles import FakeLLM, FakeOracle, make_context
 
 INTENT_JSON = '{"intent": "aggregate sales", "entities": {}, "schema_hint": "SALES"}'
 GOOD_SQL = "SELECT region, SUM(total) FROM SALES.VW_SALES_SUMMARY GROUP BY region"
+ANSWER = "Total sales for the West region were 100 units."
 
 SAMPLE_SCHEMA: dict[str, Any] = {
     "SALES": {
@@ -83,6 +84,12 @@ def test_classify_query_unparseable_falls_back() -> None:
     assert state["category"] is AgentCategory.RETRIEVE
 
 
+def test_classify_query_malformed_json_falls_back() -> None:
+    context = make_context(llm=FakeLLM(['{"category": }']))
+    state = classify_query("anything", context)
+    assert state["category"] is AgentCategory.RETRIEVE
+
+
 def test_classify_query_llm_error_falls_back() -> None:
     context = make_context(llm=FakeLLM([]))
     state = classify_query("anything", context)
@@ -102,7 +109,7 @@ def test_run_agent_routes_to_retrieve() -> None:
         result=QueryResult(columns=["REGION"], rows=[["West", 100]]),
     )
     context = make_context(
-        llm=FakeLLM(['{"category": "retrieve"}', INTENT_JSON, GOOD_SQL]),
+        llm=FakeLLM(['{"category": "retrieve"}', GOOD_SQL, ANSWER]),
         connection=oracle,
     )
     state = run_agent("Sum sales by region", context)
@@ -112,6 +119,7 @@ def test_run_agent_routes_to_retrieve() -> None:
     assert state["query_columns"] == ["REGION"]
     assert state["query_rows"] == [["West", 100]]
     assert state["sql_query"] == GOOD_SQL
+    assert state["answer"] == ANSWER
     assert ("classify_intent", "Classified as 'retrieve'") in state["logs"]
 
 
