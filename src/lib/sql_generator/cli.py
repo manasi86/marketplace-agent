@@ -1,7 +1,7 @@
 """Standalone CLI entry point for the SQL generator agent."""
 
 import argparse
-import sys
+import logging
 
 from dotenv import load_dotenv
 
@@ -10,6 +10,9 @@ from lib.sql_generator.context import build_context
 from lib.sql_generator.display import print_agent_output
 from lib.sql_generator.graph import run_agent
 from lib.sql_generator.llm import LLMError
+from lib.sql_generator.logging_setup import configure_logging
+
+logger = logging.getLogger(__name__)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -22,6 +25,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "query",
         help="Natural-language question, e.g. 'Show total sales by region for Q1 2026'",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Show DEBUG-level logs (prompts, SQL and model responses) on stderr.",
+    )
     return parser.parse_args(argv)
 
 
@@ -29,28 +38,30 @@ def main(argv: list[str] | None = None) -> int:
     """Run the agent and render results; return a process exit code."""
     load_dotenv()
     args = parse_args(argv)
+    configure_logging(verbose=args.verbose)
     settings = get_settings()
+    logger.debug(
+        "Agent settings loaded: model=%s max_sql_attempts=%d",
+        settings.sql_gen_model,
+        settings.max_sql_attempts,
+    )
 
     if not settings.has_llm_credentials:
-        print(
-            "ERROR: SQL_GEN_API_KEY is not set. Copy .env.example to .env "
-            "and fill in your values.",
-            file=sys.stderr,
+        logger.error(
+            "SQL_GEN_API_KEY is not set. Copy .env.example to .env and fill in your values."
         )
         return 2
     if not settings.has_oracle_credentials:
-        print(
-            "ERROR: ORACLE_DSN, ORACLE_USER or ORACLE_PASSWORD missing. Update your .env file.",
-            file=sys.stderr,
-        )
+        logger.error("ORACLE_DSN, ORACLE_USER or ORACLE_PASSWORD missing. Update your .env file.")
         return 2
 
     try:
         context = build_context(settings)
     except LLMError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+        logger.error("%s", exc)
         return 2
 
+    logger.info("Query: %s", args.query)
     state = run_agent(args.query, context)
     print_agent_output(state)
     if state.get("error") is not None:

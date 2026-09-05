@@ -2,8 +2,11 @@
 
 from typing import Any
 
+import pytest
+
 from lib.sql_generator.db import QueryResult
-from lib.sql_generator.graph import build_graph, run_agent
+from lib.sql_generator.graph import _log_step, build_graph, run_agent
+from lib.sql_generator.state import initial_state
 from tests.doubles import FakeLLM, FakeOracle, make_context
 
 INTENT_JSON = '{"intent": "aggregate sales", "entities": {}, "schema_hint": "SALES"}'
@@ -109,3 +112,16 @@ def test_run_agent_execution_failure_sets_error() -> None:
     assert state["done"] is True
     assert state["error"] == "ORA-06550: line 1, column 7"
     assert state["query_rows"] is None
+
+
+def test_log_step_reraises_and_logs_failures(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def boom(state: Any) -> dict[str, Any]:
+        del state
+        raise RuntimeError("node exploded")
+
+    wrapped = _log_step("explosive")(boom)
+    with pytest.raises(RuntimeError, match="node exploded"):
+        wrapped(initial_state("Sum sales", 3))
+    assert any("Step [explosive] failed" in record.getMessage() for record in caplog.records)
