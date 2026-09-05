@@ -1,13 +1,19 @@
 """LangGraph wiring for the SQL generator agent."""
 
+from collections.abc import Callable
+import functools
+import logging
+from time import perf_counter
 from typing import Any, cast
 
 from langgraph.graph import END, StateGraph
 
 from lib.sql_generator.context import AgentContext
-from lib.sql_generator.nodes import build_nodes
+from lib.sql_generator.nodes import NodeFn, build_nodes
 from lib.sql_generator.observability import observe_run, observe_step
 from lib.sql_generator.state import AgentState, initial_state
+
+logger = logging.getLogger(__name__)
 
 NODE_NAMES = (
     "understand_intent",
@@ -19,13 +25,35 @@ NODE_NAMES = (
 )
 
 
+def _log_step(name: str) -> Callable[[NodeFn], NodeFn]:
+    """Return a decorator that logs each graph step with its duration."""
+
+    def _decorator(func: NodeFn) -> NodeFn:
+        @functools.wraps(func)
+        def _wrapped(state: AgentState) -> dict[str, Any]:
+            logger.info("Step [%s] started", name)
+            start = perf_counter()
+            try:
+                result = func(state)
+            except Exception:
+                logger.exception("Step [%s] failed", name)
+                raise
+            elapsed_ms = (perf_counter() - start) * 1000.0
+            logger.info("Step [%s] completed in %.1f ms", name, elapsed_ms)
+            return result
+
+        return _wrapped
+
+    return _decorator
+
+
 def build_graph(context: AgentContext) -> Any:
     """Compile the agent's StateGraph with traced node functions."""
     nodes = build_nodes(context)
     graph = StateGraph(AgentState)
     for name in NODE_NAMES:
         graph.add_node(  # type: ignore[call-overload]
-            name, observe_step(name)(nodes[name])
+            name, observe_step(name)(_log_step(name)(nodes[name]))
         )
 
     graph.set_entry_point("understand_intent")
@@ -53,9 +81,15 @@ def build_graph(context: AgentContext) -> Any:
 @observe_run("sql_generator_agent")
 def run_agent(user_query: str, context: AgentContext) -> AgentState:
     """Execute the full agent pipeline for a natural-language question."""
+    logger.info("Starting agent run for query: %s", user_query)
     graph = build_graph(context)
     state = initial_state(user_query, context.settings.max_sql_attempts)
-    return cast(AgentState, graph.invoke(state))
+    result = cast(AgentState, graph.invoke(state))
+    if result.get("error") is not None:
+        logger.error("Agent run finished with an error: %s", result["error"])
+    else:
+        logger.info("Agent run finished successfully.")
+    return result
 
 
 def _route_after_connection(state: AgentState) -> str:

@@ -2,11 +2,14 @@
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+import logging
 from typing import Any
 
 import oracledb
 
 from lib.sql_generator.config import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class DatabaseError(Exception):
@@ -47,12 +50,15 @@ class OracleConnection:
                 "and ORACLE_PASSWORD in the .env file."
             )
         try:
+            logger.info("Connecting to Oracle database...")
             self._connection = _connect_oracle(
                 user=self._settings.oracle_user,
                 password=self._settings.oracle_password,
                 dsn=self._settings.oracle_dsn,
             )
+            logger.info("Connected to Oracle (dsn=%s)", self._settings.oracle_dsn)
         except oracledb.Error as exc:
+            logger.error("Failed to connect to Oracle: %s", exc)
             raise DatabaseError(f"Failed to connect to Oracle: {exc}") from exc
 
     def check_connection(self) -> bool:
@@ -70,6 +76,8 @@ class OracleConnection:
     def execute_query(self, sql: str) -> QueryResult:
         """Execute a SELECT statement and return its columns and rows."""
         self.connect()
+        logger.info("Executing query (%d chars)", len(sql))
+        logger.debug("SQL:\n%s", sql)
         try:
             connection = self._connection
             assert connection is not None
@@ -79,19 +87,23 @@ class OracleConnection:
                     return QueryResult(columns=[], rows=[])
                 columns = [description[0] for description in cursor.description]
                 rows = [list(row) for row in cursor.fetchall()]
+                logger.info("Query complete: %d row(s)", len(rows))
                 return QueryResult(columns=columns, rows=rows)
         except oracledb.Error as exc:
+            logger.error("Query execution failed: %s", exc)
             raise DatabaseError(f"Query execution failed: {exc}") from exc
 
     def explain_query(self, sql: str) -> None:
         """Compile the query via EXPLAIN PLAN, raising on any error."""
         self.connect()
+        logger.debug("EXPLAIN PLAN FOR %s", sql)
         self._execute(f"EXPLAIN PLAN FOR {sql}")
 
     def fetch_schema(self) -> dict[str, Any]:
         """Discover business tables, views and columns from the data dictionary."""
         self.connect()
         owners = self._fetch_owners()
+        logger.info("Fetching schema for %d owner(s): %s", len(owners), ", ".join(owners))
         schemas: dict[str, Any] = {}
         for owner in owners:
             schemas[owner] = {"tables": self._fetch_objects(owner)}
