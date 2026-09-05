@@ -62,6 +62,7 @@ def main(argv: list[str] | None = None) -> int:
         cast(BaseAgentState, state),
         results=_build_results(state),
         failure_message=state.get("error"),
+        answer=state.get("answer"),
     )
     if state.get("error") is not None:
         return 1

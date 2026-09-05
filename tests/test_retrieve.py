@@ -13,8 +13,8 @@ from agents.retrieve.graph import build_graph, run_agent
 from tests.doubles import FakeLLM, FakeOracle, make_context
 
 _QUERY = "Show total sales by region"
-INTENT_JSON = '{"intent": "aggregate sales", "entities": {}, "schema_hint": "SALES"}'
 GOOD_SQL = "SELECT region, SUM(total) FROM SALES.VW_SALES_SUMMARY GROUP BY region"
+ANSWER = "Total sales for the West region were 100 units."
 
 SAMPLE_SCHEMA: dict[str, Any] = {
     "SALES": {
@@ -34,7 +34,7 @@ SAMPLE_SCHEMA: dict[str, Any] = {
 
 def _context() -> Any:
     return make_context(
-        llm=FakeLLM([INTENT_JSON, GOOD_SQL]),
+        llm=FakeLLM([GOOD_SQL, ANSWER]),
         connection=FakeOracle(
             fetch_schema=SAMPLE_SCHEMA,
             result=QueryResult(columns=["REGION"], rows=[["West", 100]]),
@@ -70,7 +70,7 @@ def test_sql_generator_is_not_registered() -> None:
 def test_build_graph_returns_compiled_graph() -> None:
     graph = build_graph(make_context())
     assert callable(graph.invoke)
-    assert "understand_intent" in graph.nodes
+    assert "check_db_connection" in graph.nodes
 
 
 def test_run_agent_returns_factual_data() -> None:
@@ -80,12 +80,42 @@ def test_run_agent_returns_factual_data() -> None:
     assert state["query_columns"] == ["REGION"]
     assert state["query_rows"] == [["West", 100]]
     assert state["sql_query"] == GOOD_SQL
+    assert state["answer"] == ANSWER
+
+
+def test_run_agent_falls_back_to_template_answer_on_llm_error() -> None:
+    context = make_context(
+        llm=FakeLLM([GOOD_SQL]),
+        connection=FakeOracle(
+            fetch_schema=SAMPLE_SCHEMA,
+            result=QueryResult(columns=["REGION"], rows=[["West", 100]]),
+        ),
+    )
+    state = run_agent(_QUERY, context)
+    assert state["error"] is None
+    assert "REGION: West" in (state["answer"] or "")
+    assert "returned 1 row(s)" in (state["answer"] or "")
+
+
+def test_run_agent_no_row_no_answer() -> None:
+    context = make_context(
+        llm=FakeLLM([GOOD_SQL]),
+        connection=FakeOracle(
+            fetch_schema=SAMPLE_SCHEMA,
+            result=QueryResult(columns=["REGION"], rows=[]),
+        ),
+    )
+    state = run_agent(_QUERY, context)
+    assert state["done"] is True
+    assert state["query_rows"] == []
+    assert state["answer"] is None
 
 
 def test_route_retrieve_returns_factual_data() -> None:
     state = route(AgentCategory.RETRIEVE, _QUERY, _context())
     assert state["error"] is None
     assert state["query_rows"] == [["West", 100]]
+    assert state["answer"] == ANSWER
 
 
 def test_parse_args() -> None:

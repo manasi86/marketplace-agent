@@ -17,7 +17,8 @@ def test_initial_state_defaults() -> None:
     assert state["sql_query"] == ""
     assert state["semantic_context"] == ""
     assert state["semantic_metadata"] == {}
-    assert state["entities"] == {}
+    assert state["schema_hint"] is None
+    assert state["answer"] is None
     assert state["query_rows"] is None
     assert state["query_columns"] is None
     assert state["execution_time_ms"] is None

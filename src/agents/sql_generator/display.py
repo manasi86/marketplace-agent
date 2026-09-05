@@ -9,12 +9,11 @@ from agents.common.display import print_agent_output as print_common_output
 from agents.sql_generator.state import SqlGeneratorState
 
 NODE_TITLES: Mapping[str, str] = {
-    "understand_intent": "1. Understand Intent",
-    "check_db_connection": "2. Check DB Connection",
-    "discover_semantic_layer": "3. Discover Semantic Layer",
-    "generate_sql": "4. Generate SQL",
-    "validate_sql": "5. Validate SQL",
-    "execute_and_display": "6. Execute & Display",
+    "check_db_connection": "1. Check DB Connection",
+    "discover_semantic_layer": "2. Discover Semantic Layer",
+    "generate_sql": "3. Generate SQL",
+    "validate_sql": "4. Validate SQL",
+    "execute_and_display": "5. Execute & Display",
 }
 
 

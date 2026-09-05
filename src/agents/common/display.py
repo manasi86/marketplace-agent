@@ -51,6 +51,11 @@ def build_failure_panel(message: str) -> Panel:
     return Panel(Text(message, style="bold red"), title="Failure", border_style="red")
 
 
+def build_answer_panel(answer: str) -> Panel:
+    """Render an agent's natural-language answer prominently."""
+    return Panel(Text(answer.strip(), style="bold green"), title="Answer", border_style="green")
+
+
 def build_result_table(results: Results) -> Table:
     """Build a Rich table from ``results`` and its metadata caption."""
     table = Table(title="Query Results", show_lines=False)
@@ -68,12 +73,15 @@ def print_agent_output(
     node_titles: Mapping[str, str] | None = None,
     results: Results | None = None,
     failure_message: str | None = None,
+    answer: str | None = None,
     console: Console | None = None,
 ) -> None:
-    """Print the full agent output: per-node logs plus results (or error)."""
+    """Print the full agent output: per-node logs plus answer and results (or error)."""
     output_console = console or Console()
     for panel in build_log_panels(state, node_titles):
         output_console.print(panel)
+    if answer is not None:
+        output_console.print(build_answer_panel(answer))
     if results is not None:
         output_console.print(build_result_table(results))
         return

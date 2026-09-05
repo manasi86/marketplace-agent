@@ -1,18 +1,14 @@
 """Tests for the graph node functions."""
 
-from datetime import date
 from typing import Any, cast
 
 from agents.common.config import Settings
 from agents.common.db import QueryResult
 from agents.common.semantic import SemanticContext
-from agents.sql_generator.nodes import _parse_intent_json, build_nodes
+from agents.sql_generator.nodes import build_nodes
 from agents.sql_generator.state import SqlGeneratorState, initial_state
 from tests.doubles import FakeLLM, FakeOracle, make_context
 
-INTENT_JSON = (
-    '{"intent": "aggregate sales", "entities": {"region": "West"}, "schema_hint": "SALES"}'
-)
 GOOD_SQL = "SELECT region, SUM(total) FROM SALES.VW_SALES_SUMMARY GROUP BY region"
 
 SAMPLE_SCHEMA: dict[str, Any] = {
@@ -35,69 +31,6 @@ def _node_state(**overrides: Any) -> SqlGeneratorState:
     state = initial_state("Show sales", 3)
     state.update(cast(Any, overrides))
     return state
-
-
-def test_understand_intent_parses_json() -> None:
-    context = make_context(llm=FakeLLM([INTENT_JSON]))
-    node = build_nodes(context)["understand_intent"]
-    update = node(_node_state(user_query="Show sales by region"))
-    assert update["intent"] == "aggregate sales"
-    assert update["entities"] == {"region": "West"}
-    assert update["schema_hint"] == "SALES"
-    assert ("understand_intent", "Understood intent: aggregate sales") in update["logs"]
-
-
-def test_understand_intent_with_null_schema_hint() -> None:
-    llm = FakeLLM(['{"intent": "count rows", "entities": {}, "schema_hint": null}'])
-    context = make_context(llm=llm)
-    node = build_nodes(context)["understand_intent"]
-    update = node(_node_state(user_query="How many rows?"))
-    assert update["schema_hint"] is None
-    assert update["entities"] == {}
-
-
-def test_understand_intent_parses_date_range() -> None:
-    llm = FakeLLM(
-        [
-            (
-                '{"intent": "sales by day", '
-                '"entities": {"date_range": "2025-01-01 to 2025-12-31"}, '
-                '"schema_hint": null}'
-            )
-        ]
-    )
-    context = make_context(llm=llm)
-    node = build_nodes(context)["understand_intent"]
-    update = node(_node_state(user_query="Sales in 2025"))
-    assert update["date_start"] == date(2025, 1, 1)
-    assert update["date_end"] == date(2025, 12, 31)
-
-
-def test_understand_intent_ignores_bad_date_range() -> None:
-    llm = FakeLLM(
-        ['{"intent": "x", "entities": {"date_range": "never ever"}, "schema_hint": null}']
-    )
-    context = make_context(llm=llm)
-    node = build_nodes(context)["understand_intent"]
-    update = node(_node_state(user_query="what up"))
-    assert update["date_start"] is None
-    assert update["date_end"] is None
-
-
-def test_understand_intent_llm_error_falls_back() -> None:
-    context = make_context(llm=FakeLLM([]))
-    node = build_nodes(context)["understand_intent"]
-    update = node(_node_state(user_query="count everything"))
-    assert update["intent"] == "count everything"
-    assert update["entities"] == {}
-    assert update["schema_hint"] is None
-
-
-def test_understand_intent_unparseable_falls_back() -> None:
-    context = make_context(llm=FakeLLM(["this is not json"]))
-    node = build_nodes(context)["understand_intent"]
-    update = node(_node_state(user_query="list orders"))
-    assert update["intent"] == "list orders"
 
 
 def test_check_db_connection_success() -> None:
@@ -131,8 +64,7 @@ def test_discover_semantic_layer_no_hint() -> None:
 def test_discover_semantic_layer_with_hint() -> None:
     semantic = SemanticContext()
     semantic._metadata = SAMPLE_SCHEMA
-    semantic_ref = semantic
-    context = make_context(semantic=semantic_ref)
+    context = make_context(semantic=semantic)
     node = build_nodes(context)["discover_semantic_layer"]
     update = node(_node_state(schema_hint="SALES"))
     assert "(schema hint: SALES)" in update["logs"][0][1]
@@ -143,8 +75,7 @@ def test_generate_sql_without_validation_error() -> None:
     node = build_nodes(context)["generate_sql"]
     update = node(
         _node_state(
-            intent="aggregate sales",
-            entities={"region": "West"},
+            user_query="Show total sales",
             semantic_context="Schema: SALES",
             validation_error=None,
         )
@@ -158,8 +89,7 @@ def test_generate_sql_with_validation_error() -> None:
     node = build_nodes(context)["generate_sql"]
     update = node(
         _node_state(
-            intent="aggregate sales",
-            entities={},
+            user_query="Show total sales",
             semantic_context="Schema: SALES",
             validation_error="ORA-00904 invalid identifier",
         )
@@ -171,7 +101,7 @@ def test_generate_sql_with_validation_error() -> None:
 def test_generate_sql_llm_failure() -> None:
     context = make_context(llm=FakeLLM([]))
     node = build_nodes(context)["generate_sql"]
-    update = node(_node_state(intent="x", entities={}, semantic_context="Schema: SALES"))
+    update = node(_node_state(user_query="show me", semantic_context="Schema: SALES"))
     assert update["error"] == "No scripted responses left."
     assert update["done"] is True
 
@@ -224,26 +154,6 @@ def test_execute_and_display_database_error() -> None:
     update = node(_node_state(sql_query=GOOD_SQL))
     assert update["error"] == "ORA-00942: table or view does not exist"
     assert update["done"] is True
-
-
-def test_parse_intent_json_success() -> None:
-    assert _parse_intent_json(INTENT_JSON)["intent"] == "aggregate sales"
-
-
-def test_parse_intent_json_no_json_match() -> None:
-    assert _parse_intent_json("nothing here") == {
-        "intent": "",
-        "entities": {},
-        "schema_hint": None,
-    }
-
-
-def test_parse_intent_json_malformed() -> None:
-    assert _parse_intent_json('{"intent": }') == {
-        "intent": "",
-        "entities": {},
-        "schema_hint": None,
-    }
 
 
 def test_settings_default_in_context() -> None:

@@ -1,6 +1,5 @@
 """Graph state for the shared SQL generator pipeline."""
 
-from datetime import date
 from operator import add
 from typing import Annotated, Any
 
@@ -11,11 +10,7 @@ class SqlGeneratorState(BaseAgentState):
     """State threaded through the SQL generator pipeline."""
 
     user_query: str
-    intent: str
-    entities: dict[str, Any]
     schema_hint: str | None
-    date_start: date | None
-    date_end: date | None
     db_connected: bool
     semantic_context: str
     semantic_metadata: dict[str, Any]
@@ -26,6 +21,7 @@ class SqlGeneratorState(BaseAgentState):
     query_columns: list[str] | None
     query_rows: list[list[Any]] | None
     execution_time_ms: float | None
+    answer: str | None
     logs: Annotated[list[tuple[str, str]], add]
     error: str | None
     done: bool
@@ -35,11 +31,7 @@ def initial_state(user_query: str, max_attempts: int) -> SqlGeneratorState:
     """Build a fresh SqlGeneratorState with sensible defaults for a new run."""
     return SqlGeneratorState(
         user_query=user_query,
-        intent="",
-        entities={},
         schema_hint=None,
-        date_start=None,
-        date_end=None,
         db_connected=False,
         semantic_context="",
         semantic_metadata={},
@@ -50,6 +42,7 @@ def initial_state(user_query: str, max_attempts: int) -> SqlGeneratorState:
         query_columns=None,
         query_rows=None,
         execution_time_ms=None,
+        answer=None,
         logs=[],
         error=None,
         done=False,

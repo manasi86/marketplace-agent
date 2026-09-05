@@ -8,9 +8,7 @@ from typing import Any
 from agents.common.context import AgentContext
 from agents.common.db import DatabaseError
 from agents.common.llm import LLMError, invoke_llm
-from agents.common.prompts import parse_json_object
-from agents.sql_generator.dates import parse_date_range
-from agents.sql_generator.prompts import intent_prompt, sql_generation_prompt
+from agents.sql_generator.prompts import sql_generation_prompt
 from agents.sql_generator.state import SqlGeneratorState
 from agents.sql_generator.validator import sanitize_sql, validate_sql
 
@@ -21,44 +19,6 @@ NodeFn = Callable[[SqlGeneratorState], dict[str, Any]]
 
 def build_nodes(context: AgentContext) -> dict[str, NodeFn]:
     """Create the agent's graph nodes closed over the shared agent context."""
-
-    def understand_intent(state: SqlGeneratorState) -> dict[str, Any]:
-        logger.info("Understanding intent for query: %s", state["user_query"])
-        try:
-            raw = invoke_llm(context.llm, intent_prompt(state["user_query"]))
-            parsed = _parse_intent_json(raw)
-        except LLMError:
-            logger.warning(
-                "LLM intent parsing failed; falling back to the raw query.",
-                exc_info=True,
-            )
-            parsed = {
-                "intent": state["user_query"],
-                "entities": {},
-                "schema_hint": None,
-            }
-        schema_hint = parsed.get("schema_hint")
-        entities = parsed.get("entities") or {}
-        date_start, date_end = parse_date_range(entities)
-        logger.info(
-            "Intent parsed: %r (schema_hint=%r, entities=%r)",
-            parsed.get("intent"),
-            schema_hint,
-            entities,
-        )
-        return {
-            "intent": str(parsed.get("intent") or state["user_query"]),
-            "entities": entities,
-            "schema_hint": (str(schema_hint) if schema_hint else None),
-            "date_start": date_start,
-            "date_end": date_end,
-            "logs": [
-                (
-                    "understand_intent",
-                    f"Understood intent: {parsed.get('intent') or state['user_query']}",
-                ),
-            ],
-        }
 
     def check_db_connection(state: SqlGeneratorState) -> dict[str, Any]:
         del state
@@ -110,12 +70,9 @@ def build_nodes(context: AgentContext) -> dict[str, NodeFn]:
         )
         logger.info("Generating SQL%s...", attempt_note)
         prompt = sql_generation_prompt(
-            state["intent"],
-            state["entities"],
+            state["user_query"],
             state["semantic_context"],
             state.get("validation_error"),
-            date_start=state.get("date_start"),
-            date_end=state.get("date_end"),
         )
         logger.debug("SQL generation prompt:\n%s", prompt)
         try:
@@ -205,18 +162,9 @@ def build_nodes(context: AgentContext) -> dict[str, NodeFn]:
         }
 
     return {
-        "understand_intent": understand_intent,
         "check_db_connection": check_db_connection,
         "discover_semantic_layer": discover_semantic_layer,
         "generate_sql": generate_sql,
         "validate_sql": validate_sql_query,
         "execute_and_display": execute_and_display,
     }
-
-
-def _parse_intent_json(raw: str) -> dict[str, Any]:
-    """Tolerantly parse an intent JSON object from a model response."""
-    parsed = parse_json_object(raw)
-    if "intent" not in parsed and not parsed:
-        return {"intent": "", "entities": {}, "schema_hint": None}
-    return parsed

@@ -76,6 +76,7 @@ def test_main_success_retrieve_results(
         "execution_time_ms": 3.5,
         "sql_query": GOOD_SQL,
         "attempt_count": 0,
+        "answer": "Total sales for the West region were 100 units.",
     }
     monkeypatch.setattr(cli, "build_context", lambda settings: context)
     monkeypatch.setattr(cli, "run_agent", lambda query, ctx: state)
@@ -84,6 +85,8 @@ def test_main_success_retrieve_results(
     assert "Classified as 'retrieve'" in output
     assert "REGION" in output
     assert "West" in output
+    assert "Answer" in output
+    assert "Total sales for the West region were 100 units." in output
 
 
 def test_main_error_path(
