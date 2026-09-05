@@ -47,14 +47,30 @@ Set `LANGFUSE_ENABLED=false` to disable observability.
 
 ## Running the Agent
 
+The coordinator classifies each request into one of four intents — **Act, Retrieve,
+Recommend, Observe** — and routes it to the matching agent:
+
 ```shell
-uv run python -m lib.sql_generator "<your question>"
+uv run python -m agents "<your question>"
 ```
 
 For example:
 
 ```shell
-uv run python -m lib.sql_generator "Show total sales by region for Q1 2026"
+uv run python -m agents "Show total sales by region for Q1 2026"
+```
+
+The Retrieve agent (which returns factual data) can also be invoked directly:
+
+```shell
+uv run python -m agents.retrieve "Show total sales by region for Q1 2026"
+```
+
+Its underlying engine — the shared SQL generator pipeline used by the Retrieve agent
+(and by upcoming agents that need to answer data questions) — is available the same way:
+
+```shell
+uv run python -m agents.sql_generator "Show total sales by region for Q1 2026"
 ```
 
 Exit codes: `0` on success, `1` when the pipeline completes with an error, and `2` on
@@ -249,7 +265,7 @@ communicate the presence of inline type annotations to static type
 checkers. [mypy's documentation](https://mypy.readthedocs.io/en/stable/installed_packages.html)
 provides further examples on how to do this.
 
-Mypy looks for the existence of a file named [`py.typed`](./src/lib/py.typed) in the root of the
+Mypy looks for the existence of a file named [`py.typed`](./src/agents/py.typed) in the root of the
 installed package to indicate that inline type annotations should be checked.
 
 ## Continuous Integration
@@ -331,9 +347,12 @@ structure, like:
 
 ``` {.sourceCode .}
 marketplace-Agent
-├── lib
+├── agents
 │   ├── __init__.py
-│   └── lib.py
+│   ├── retrieve
+│   │   └── __init__.py
+│   └── sql_generator
+│       └── __init__.py
 ├── api
 │   └── __init__.py
 ├── tests
@@ -355,7 +374,7 @@ this isolation for two reasons:
 1. Calling `python` in the project root (for example, `python -m pytest tests/`)
    [causes Python to add the current working directory](https://docs.pytest.org/en/latest/pythonpath.html#invoking-pytest-versus-python-m-pytest)
    (the project root) to `sys.path`, which Python uses to find modules. Because the source
-   package `lib` is in the project root, it shadows the `lib` package installed in the Nox
+   package `agents` is in the project root, it shadows the `agents` package installed in the Nox
    session.
 2. Calling `pytest` directly anywhere that it can find the tests will also add the project root
    to `sys.path` if the `tests` folder is a Python package (that is, it contains a `__init__.py`
@@ -382,9 +401,12 @@ marketplace-Agent
 ├── src
 │   ├── api
 │   │   └── __init__.py
-│   └── lib
+│   └── agents
 │       ├── __init__.py
-│       └── lib.py
+│       ├── retrieve
+│       │   └── __init__.py
+│       └── sql_generator
+│           └── __init__.py
 ├── tests
 │   ├── __init__.py
 │   └── test_imports.py

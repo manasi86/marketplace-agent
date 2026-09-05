@@ -3,7 +3,7 @@
 from pydantic_settings import BaseSettings
 import pytest
 
-from lib.sql_generator.config import Settings, get_settings
+from agents.common.config import Settings, get_settings
 
 
 class TestSettings:

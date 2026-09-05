@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from lib.sql_generator.dates import oracle_date_literal, oracle_date_range, parse_date_range
+from agents.sql_generator.dates import oracle_date_literal, oracle_date_range, parse_date_range
 
 
 def test_parse_date_range_full_range() -> None:

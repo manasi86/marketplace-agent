@@ -1,6 +1,6 @@
 """Tests for the graph state model."""
 
-from lib.sql_generator.state import initial_state
+from agents.sql_generator.state import initial_state
 
 
 def test_initial_state_defaults() -> None:

@@ -43,7 +43,7 @@ Documentation = "https://your-org.github.io/marketplace-Agent/"
 Repository = "https://github.com/your-org/marketplace-Agent"
 
 [tool.uv.build-backend]
-module-name = "lib"
+module-name = "agents"
 module-root = "src"
 
 [dependency-groups]

@@ -5,8 +5,8 @@ from typing import Any
 import oracledb
 import pytest
 
-from lib.sql_generator.config import Settings
-from lib.sql_generator.db import SYSTEM_SCHEMAS, DatabaseError, OracleConnection, _connect_oracle
+from agents.common.config import Settings
+from agents.common.db import SYSTEM_SCHEMAS, DatabaseError, OracleConnection, _connect_oracle
 
 
 class _FakeCursor:
@@ -88,7 +88,7 @@ def test_connect_open_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     def fail(*args: Any, **kwargs: Any) -> None:
         raise oracledb.Error("ORACLE: unable to connect")
 
-    monkeypatch.setattr("lib.sql_generator.db._connect_oracle", fail)
+    monkeypatch.setattr("agents.common.db._connect_oracle", fail)
     connection = OracleConnection(_settings())
     with pytest.raises(DatabaseError, match="Failed to connect"):
         connection.connect()
@@ -96,7 +96,7 @@ def test_connect_open_failure(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_connect_and_reconnect_is_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = _FakeConnection()
-    monkeypatch.setattr("lib.sql_generator.db._connect_oracle", lambda *a, **k: fake)
+    monkeypatch.setattr("agents.common.db._connect_oracle", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
     connection.connect()
     connection.connect()
@@ -106,7 +106,7 @@ def test_connect_and_reconnect_is_idempotent(monkeypatch: pytest.MonkeyPatch) ->
 def test_check_connection_true(monkeypatch: pytest.MonkeyPatch) -> None:
     cursor = _FakeCursor()
     fake = _FakeConnection([cursor])
-    monkeypatch.setattr("lib.sql_generator.db._connect_oracle", lambda *a, **k: fake)
+    monkeypatch.setattr("agents.common.db._connect_oracle", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
     assert connection.check_connection() is True
     assert cursor.executed == [("SELECT 1 FROM DUAL", ())]
@@ -116,7 +116,7 @@ def test_check_connection_connect_failure_is_false(monkeypatch: pytest.MonkeyPat
     def fail(*args: Any, **kwargs: Any) -> None:
         raise oracledb.Error("nope")
 
-    monkeypatch.setattr("lib.sql_generator.db._connect_oracle", fail)
+    monkeypatch.setattr("agents.common.db._connect_oracle", fail)
     connection = OracleConnection(_settings())
     assert connection.check_connection() is False
 
@@ -124,7 +124,7 @@ def test_check_connection_connect_failure_is_false(monkeypatch: pytest.MonkeyPat
 def test_check_connection_execute_failure_is_false(monkeypatch: pytest.MonkeyPatch) -> None:
     cursor = _FakeCursor(execute_error=oracledb.Error("boom"))
     fake = _FakeConnection([cursor])
-    monkeypatch.setattr("lib.sql_generator.db._connect_oracle", lambda *a, **k: fake)
+    monkeypatch.setattr("agents.common.db._connect_oracle", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
     assert connection.check_connection() is False
 
@@ -135,7 +135,7 @@ def test_execute_query_returns_columns_and_rows(monkeypatch: pytest.MonkeyPatch)
         rows=[("East", 100.0), ("West", 50.0)],
     )
     fake = _FakeConnection([cursor])
-    monkeypatch.setattr("lib.sql_generator.db._connect_oracle", lambda *a, **k: fake)
+    monkeypatch.setattr("agents.common.db._connect_oracle", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
     result = connection.execute_query("SELECT region, total FROM vw_sales")
     assert result.columns == ["REGION", "TOTAL"]
@@ -145,7 +145,7 @@ def test_execute_query_returns_columns_and_rows(monkeypatch: pytest.MonkeyPatch)
 def test_execute_query_without_description(monkeypatch: pytest.MonkeyPatch) -> None:
     cursor = _FakeCursor(description=None)
     fake = _FakeConnection([cursor])
-    monkeypatch.setattr("lib.sql_generator.db._connect_oracle", lambda *a, **k: fake)
+    monkeypatch.setattr("agents.common.db._connect_oracle", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
     result = connection.execute_query("BEGIN NULL; END;")
     assert result.columns == []
@@ -155,7 +155,7 @@ def test_execute_query_without_description(monkeypatch: pytest.MonkeyPatch) -> N
 def test_execute_query_oracle_error(monkeypatch: pytest.MonkeyPatch) -> None:
     cursor = _FakeCursor(execute_error=oracledb.Error("ORA-00904"))
     fake = _FakeConnection([cursor])
-    monkeypatch.setattr("lib.sql_generator.db._connect_oracle", lambda *a, **k: fake)
+    monkeypatch.setattr("agents.common.db._connect_oracle", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
     with pytest.raises(DatabaseError, match="Query execution failed"):
         connection.execute_query("SELECT bad FROM x")
@@ -164,7 +164,7 @@ def test_execute_query_oracle_error(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_explain_query_success(monkeypatch: pytest.MonkeyPatch) -> None:
     cursor = _FakeCursor()
     fake = _FakeConnection([cursor])
-    monkeypatch.setattr("lib.sql_generator.db._connect_oracle", lambda *a, **k: fake)
+    monkeypatch.setattr("agents.common.db._connect_oracle", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
     connection.explain_query("SELECT 1 FROM dual")
     assert cursor.executed == [("EXPLAIN PLAN FOR SELECT 1 FROM dual", ())]
@@ -173,7 +173,7 @@ def test_explain_query_success(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_explain_query_error(monkeypatch: pytest.MonkeyPatch) -> None:
     cursor = _FakeCursor(execute_error=oracledb.Error("ORA-00942"))
     fake = _FakeConnection([cursor])
-    monkeypatch.setattr("lib.sql_generator.db._connect_oracle", lambda *a, **k: fake)
+    monkeypatch.setattr("agents.common.db._connect_oracle", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
     with pytest.raises(DatabaseError, match="ORA-00942"):
         connection.explain_query("SELECT * FROM nope")
@@ -213,7 +213,7 @@ def test_fetch_schema_builds_nested_metadata(monkeypatch: pytest.MonkeyPatch) ->
         rows=[],
     )
     fake = _FakeConnection([owners_cursor, inventory_cursor, sales_cursor])
-    monkeypatch.setattr("lib.sql_generator.db._connect_oracle", lambda *a, **k: fake)
+    monkeypatch.setattr("agents.common.db._connect_oracle", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
     schema = connection.fetch_schema()
 
@@ -241,14 +241,14 @@ def test_fetch_schema_builds_nested_metadata(monkeypatch: pytest.MonkeyPatch) ->
 def test_fetch_schema_skips_falsy_owners(monkeypatch: pytest.MonkeyPatch) -> None:
     owners_cursor = _FakeCursor(description=[("OWNER",)], rows=[("",), (None,)])
     fake = _FakeConnection([owners_cursor])
-    monkeypatch.setattr("lib.sql_generator.db._connect_oracle", lambda *a, **k: fake)
+    monkeypatch.setattr("agents.common.db._connect_oracle", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
     assert connection.fetch_schema() == {}
 
 
 def test_close_sets_connection_to_none(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = _FakeConnection()
-    monkeypatch.setattr("lib.sql_generator.db._connect_oracle", lambda *a, **k: fake)
+    monkeypatch.setattr("agents.common.db._connect_oracle", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
     connection.connect()
     connection.close()
@@ -259,7 +259,7 @@ def test_close_sets_connection_to_none(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_connect_oracle_function(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = _FakeConnection()
     monkeypatch.setattr(
-        "lib.sql_generator.db._oracle_connect",
+        "agents.common.db._oracle_connect",
         lambda user, password, dsn: fake,
     )
     connection = _connect_oracle("u", "p", "d")
@@ -275,7 +275,7 @@ def test_close_without_connection_is_noop() -> None:
 def test_query_dicts_without_description(monkeypatch: pytest.MonkeyPatch) -> None:
     cursor = _FakeCursor(description=None)
     fake = _FakeConnection([cursor])
-    monkeypatch.setattr("lib.sql_generator.db._oracle_connect", lambda *a, **k: fake)
+    monkeypatch.setattr("agents.common.db._oracle_connect", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
     connection.connect()
     assert connection._query_dicts("SELECT 1 FROM dual") == []
@@ -283,7 +283,7 @@ def test_query_dicts_without_description(monkeypatch: pytest.MonkeyPatch) -> Non
 
 def test_operations_without_active_connection(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "lib.sql_generator.db._connect_oracle",
+        "agents.common.db._connect_oracle",
         lambda *a, **k: _FakeConnection(),
     )
     connection = OracleConnection(_settings())
