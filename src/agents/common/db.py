@@ -100,27 +100,29 @@ class OracleConnection:
         self._execute(f"EXPLAIN PLAN FOR {sql}")
 
     def fetch_schema(self) -> dict[str, Any]:
-        """Discover business tables, views and columns from the data dictionary."""
+        """Discover business tables, views and columns for the current schema.
+
+        Only the schema the connection is logged into (e.g. ADMIN) is read, so
+        the semantic layer never iterates over other user schemas.
+        """
         self.connect()
-        owners = self._fetch_owners()
-        logger.info("Fetching schema for %d owner(s): %s", len(owners), ", ".join(owners))
-        schemas: dict[str, Any] = {}
-        for owner in owners:
-            schemas[owner] = {"tables": self._fetch_objects(owner)}
-        return schemas
+        owner = self._current_owner()
+        logger.info("Fetching schema for owner: %s", owner)
+        return {owner: {"tables": self._fetch_objects(owner)}}
+
+    def _current_owner(self) -> str:
+        rows = self._query_dicts(
+            "SELECT SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA') AS SCHEMA_NAME FROM DUAL"
+        )
+        if not rows or not rows[0].get("SCHEMA_NAME"):
+            raise DatabaseError("Unable to determine the current database schema.")
+        return str(rows[0]["SCHEMA_NAME"]).upper()
 
     def close(self) -> None:
         """Close the underlying connection, if open."""
         if self._connection is not None:
             self._connection.close()
             self._connection = None
-
-    def _fetch_owners(self) -> list[str]:
-        rows = self._query_dicts(
-            "SELECT DISTINCT OWNER FROM ALL_TABLES WHERE OWNER NOT IN " + self._placeholders(),
-            SYSTEM_SCHEMAS,
-        )
-        return sorted(str(row["OWNER"]).upper() for row in rows if row.get("OWNER"))
 
     def _fetch_objects(self, owner: str) -> dict[str, Any]:
         rows = self._query_dicts(COLUMN_QUERY, {"owner": owner})
@@ -165,45 +167,6 @@ class OracleConnection:
         except oracledb.Error as exc:
             raise DatabaseError(f"SQL execution failed: {exc}") from exc
 
-    def _placeholders(self) -> str:
-        binds = ", ".join(f":{index}" for index in range(1, len(SYSTEM_SCHEMAS) + 1))
-        return f"({binds})"
-
-
-SYSTEM_SCHEMAS: tuple[str, ...] = (
-    "SYS",
-    "SYSTEM",
-    "CTXSYS",
-    "MDSYS",
-    "XDB",
-    "LBACSYS",
-    "DVSYS",
-    "GSMADMIN_INTERNAL",
-    "OUTLN",
-    "DBSNMP",
-    "APPQOSSYS",
-    "WMSYS",
-    "EXFSYS",
-    "ORDSYS",
-    "OJVMTIM",
-    "ORACLE_OCM",
-    "AUDSYS",
-    "SYSBACKUP",
-    "SYSDG",
-    "SYSKM",
-    "SYSMAN",
-    "GGSYS",
-    "DIP",
-    "DVF",
-    "ODM",
-    "OWBSYS",
-    "SI_INFORMTN_SCHEMA",
-    "OLAPSYS",
-    "GSMROOT",
-    "SYS$UMF",
-    "REMOTE_SCHEDULER_AGENT",
-    "DBSFWUSER",
-)
 
 COLUMN_QUERY = """
     SELECT c.OWNER,

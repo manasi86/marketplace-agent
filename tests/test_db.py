@@ -6,7 +6,7 @@ import oracledb
 import pytest
 
 from agents.common.config import Settings
-from agents.common.db import SYSTEM_SCHEMAS, DatabaseError, OracleConnection, _connect_oracle
+from agents.common.db import DatabaseError, OracleConnection, _connect_oracle
 
 
 class _FakeCursor:
@@ -179,12 +179,12 @@ def test_explain_query_error(monkeypatch: pytest.MonkeyPatch) -> None:
         connection.explain_query("SELECT * FROM nope")
 
 
-def test_fetch_schema_builds_nested_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
-    owners_cursor = _FakeCursor(
-        description=[("OWNER",)],
-        rows=[("SALES",), ("INVENTORY",)],
+def test_fetch_schema_builds_admin_schema(monkeypatch: pytest.MonkeyPatch) -> None:
+    owner_cursor = _FakeCursor(
+        description=[("SCHEMA_NAME",)],
+        rows=[("ADMIN",)],
     )
-    sales_cursor = _FakeCursor(
+    columns_cursor = _FakeCursor(
         description=[
             ("OWNER",),
             ("TABLE_NAME",),
@@ -195,55 +195,40 @@ def test_fetch_schema_builds_nested_metadata(monkeypatch: pytest.MonkeyPatch) ->
             ("COLUMN_COMMENTS",),
         ],
         rows=[
-            ("SALES", "VW_SALES_SUMMARY", "VIEW", "Sales summary", "REGION", "VARCHAR2", "Region"),
-            ("SALES", "VW_SALES_SUMMARY", "VIEW", "Sales summary", "TOTAL", "NUMBER", None),
-            ("SALES", "T_ORDERS", "TABLE", None, "ORDER_ID", "NUMBER", "Order PK"),
+            ("ADMIN", "VW_SALES_SUMMARY", "VIEW", "Sales summary", "REGION", "VARCHAR2", "Region"),
+            ("ADMIN", "VW_SALES_SUMMARY", "VIEW", "Sales summary", "TOTAL", "NUMBER", None),
+            ("ADMIN", "T_ORDERS", "TABLE", None, "ORDER_ID", "NUMBER", "Order PK"),
         ],
     )
-    inventory_cursor = _FakeCursor(
-        description=[
-            ("OWNER",),
-            ("TABLE_NAME",),
-            ("TABLE_TYPE",),
-            ("TABLE_COMMENTS",),
-            ("COLUMN_NAME",),
-            ("DATA_TYPE",),
-            ("COLUMN_COMMENTS",),
-        ],
-        rows=[],
-    )
-    fake = _FakeConnection([owners_cursor, inventory_cursor, sales_cursor])
+    fake = _FakeConnection([owner_cursor, columns_cursor])
     monkeypatch.setattr("agents.common.db._connect_oracle", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
     schema = connection.fetch_schema()
 
-    assert set(schema) == {"SALES", "INVENTORY"}
-    sales = schema["SALES"]["tables"]["VW_SALES_SUMMARY"]
+    assert set(schema) == {"ADMIN"}
+    sales = schema["ADMIN"]["tables"]["VW_SALES_SUMMARY"]
     assert sales["type"] == "VIEW"
     assert sales["description"] == "Sales summary"
     assert sales["columns"]["REGION"]["type"] == "VARCHAR2"
     assert sales["columns"]["TOTAL"]["description"] is None
-    orders = schema["SALES"]["tables"]["T_ORDERS"]
+    orders = schema["ADMIN"]["tables"]["T_ORDERS"]
     assert orders["description"] is None
-    assert schema["INVENTORY"]["tables"] == {}
 
-    owners_sql, owners_args = owners_cursor.executed[0]
-    assert "OWNER NOT IN (" in owners_sql
-    assert owners_sql.endswith(")")
-    assert owners_args == (SYSTEM_SCHEMAS,)
-    assert ":1" in owners_sql
-    assert ":0" not in owners_sql
-    sales_sql, sales_args = sales_cursor.executed[0]
-    assert "SELECT c.OWNER" in sales_sql
-    assert sales_args == ({"owner": "SALES"},)
+    owner_sql, owner_args = owner_cursor.executed[0]
+    assert "CURRENT_SCHEMA" in owner_sql
+    assert owner_args == ()
+    columns_sql, columns_args = columns_cursor.executed[0]
+    assert "SELECT c.OWNER" in columns_sql
+    assert columns_args == ({"owner": "ADMIN"},)
 
 
-def test_fetch_schema_skips_falsy_owners(monkeypatch: pytest.MonkeyPatch) -> None:
-    owners_cursor = _FakeCursor(description=[("OWNER",)], rows=[("",), (None,)])
-    fake = _FakeConnection([owners_cursor])
+def test_fetch_schema_raises_when_schema_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
+    owner_cursor = _FakeCursor(description=[("SCHEMA_NAME",)], rows=[])
+    fake = _FakeConnection([owner_cursor])
     monkeypatch.setattr("agents.common.db._connect_oracle", lambda *a, **k: fake)
     connection = OracleConnection(_settings())
-    assert connection.fetch_schema() == {}
+    with pytest.raises(DatabaseError, match="Unable to determine the current database schema"):
+        connection.fetch_schema()
 
 
 def test_close_sets_connection_to_none(monkeypatch: pytest.MonkeyPatch) -> None:
