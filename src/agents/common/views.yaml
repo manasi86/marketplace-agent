@@ -1,0 +1,152 @@
+ADMIN:
+  views:
+    INVENTORY_ALL_VIEW:
+      type: VIEW
+      description: null
+      columns:
+        CREATED_AT:
+          type: DATE
+          description: null
+        LOCATION:
+          type: VARCHAR2
+          description: null
+        LOCATION_ID:
+          type: NUMBER
+          description: null
+        PLATFORM_SKU_CODE:
+          type: VARCHAR2
+          description: null
+        KIMIRICA_SKU_CODE:
+          type: VARCHAR2
+          description: null
+        SAP_CODE:
+          type: VARCHAR2
+          description: null
+        PRODUCT_NAME:
+          type: VARCHAR2
+          description: null
+        EAN:
+          type: VARCHAR2
+          description: null
+        MRP:
+          type: NUMBER
+          description: null
+        CATEGORY:
+          type: VARCHAR2
+          description: null
+        SUB_GROUP:
+          type: VARCHAR2
+          description: null
+        SUB_GROUP_2:
+          type: VARCHAR2
+          description: null
+        COLLECTION_NAME:
+          type: VARCHAR2
+          description: null
+        VARIANT:
+          type: VARCHAR2
+          description: null
+        COLLECTION_TYPE:
+          type: VARCHAR2
+          description: null
+        INVENTORY:
+          type: NUMBER
+          description: null
+        SOURCE:
+          type: VARCHAR2
+          description: null
+    INVENTORY_CITY_VIEW:
+      type: VIEW
+      description: null
+      columns:
+        CREATED_AT:
+          type: DATE
+          description: null
+        LOCATION:
+          type: VARCHAR2
+          description: null
+        LOCATION_ID:
+          type: NUMBER
+          description: null
+        PLATFORM_SKU_CODE:
+          type: VARCHAR2
+          description: null
+        KIMIRICA_SKU_CODE:
+          type: VARCHAR2
+          description: null
+        SAP_CODE:
+          type: VARCHAR2
+          description: null
+        PRODUCT_NAME:
+          type: VARCHAR2
+          description: null
+        EAN:
+          type: VARCHAR2
+          description: null
+        MRP:
+          type: NUMBER
+          description: null
+        CATEGORY:
+          type: VARCHAR2
+          description: null
+        SUB_GROUP:
+          type: VARCHAR2
+          description: null
+        SUB_GROUP_2:
+          type: VARCHAR2
+          description: null
+        COLLECTION_NAME:
+          type: VARCHAR2
+          description: null
+        VARIANT:
+          type: VARCHAR2
+          description: null
+        COLLECTION_TYPE:
+          type: VARCHAR2
+          description: null
+        INVENTORY:
+          type: NUMBER
+          description: null
+        SOURCE:
+          type: VARCHAR2
+          description: null
+        CITY:
+          type: VARCHAR2
+          description: null
+        CITY_AREA:
+          type: VARCHAR2
+          description: null
+    SALES_ALL_VIEW:
+      type: VIEW
+      description: null
+      columns:
+        SALES_SOURCE:
+          type: VARCHAR2
+          description: null
+        SALES_DATE:
+          type: DATE
+          description: null
+        SOURCE_SKU_CODE:
+          type: VARCHAR2
+          description: null
+        SOURCE_SKU_NAME:
+          type: VARCHAR2
+          description: null
+        KIMIRICA_SKU_CODE:
+          type: VARCHAR2
+          description: null
+        SAP_CODE:
+          type: VARCHAR2
+          description: null
+        CITY:
+          type: VARCHAR2
+          description: null
+        SALES_QTY:
+          type: NUMBER
+          description: null
+        UNIT_MRP:
+          type: NUMBER
+          description: null
+        SALES_VALUE:
+          type: NUMBER
+          description: null
