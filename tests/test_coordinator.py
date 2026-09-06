@@ -133,11 +133,24 @@ def test_run_agent_routes_to_placeholder_agent() -> None:
 
 
 def test_run_agent_merges_downstream_logs() -> None:
-    context = make_context(llm=FakeLLM(['{"category": "recommend"}']))
+    goal = '{"goal_clear": true, "goal": "Grow Q3 revenue"}'
+    data_needs = '{"data_needs": ["total revenue by region"]}'
+    plan = (
+        '{"understanding": "u", "data_used": "s", "key_findings": ["f"], '
+        '"recommendations": ["r"], "data_gaps": "risk", "observe_duration": "30 days"}'
+    )
+    context = make_context(
+        llm=FakeLLM(['{"category": "recommend"}', goal, data_needs, GOOD_SQL, plan]),
+        connection=FakeOracle(
+            fetch_schema=SAMPLE_SCHEMA,
+            result=QueryResult(columns=["REGION"], rows=[["West", 100]]),
+        ),
+        input_fn=lambda _prompt: "approve",
+    )
     state = run_agent("Suggest something", context)
     assert state["category"] is AgentCategory.RECOMMEND
     assert any(log[0] == "classify_intent" for log in state["logs"])
-    assert any(log[0] == "placeholder" for log in state["logs"])
+    assert any(log[0] == "recommend" for log in state["logs"])
 
 
 def test_coordinator_main_modules_importable() -> None:

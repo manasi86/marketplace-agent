@@ -71,6 +71,7 @@ def make_context(
     llm: FakeLLM | None = None,
     connection: FakeOracle | None = None,
     semantic: SemanticContext | None = None,
+    input_fn: Any = input,
 ) -> AgentContext:
     """Build an AgentContext wired to fakes, defaulting sensibly."""
     resolved_settings = settings or Settings(sql_gen_api_key="test-key", langfuse_enabled=False)
@@ -79,4 +80,5 @@ def make_context(
         llm=cast(LanguageModelLike, llm or FakeLLM()),
         connection=cast(OracleConnection, connection or FakeOracle()),
         semantic=semantic or SemanticContext(),
+        input_fn=input_fn,
     )

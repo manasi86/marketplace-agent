@@ -307,6 +307,44 @@ def test_pager_eof_returns() -> None:
     assert "51" not in _normalize(buffer.getvalue())
 
 
+def test_pager_unknown_and_invalid_jump_keep_page() -> None:
+    buffer, console = _console()
+    commands = iter(["x", "j not-a-number", "q"])
+    _run_pager(_many_rows(120), console, 50, input_fn=lambda _: next(commands))
+    output = _normalize(buffer.getvalue())
+    assert "50" in output
+    assert "51" not in output
+
+
+def test_print_result_table_paginated_uses_real_is_interactive() -> None:
+    buffer, console = _console()
+    print_result_table_paginated(
+        _many_rows(120),
+        console,
+        page_size=50,
+        input_fn=lambda _: "q",
+    )
+    output = _normalize(buffer.getvalue())
+    assert "50" in output
+    assert "51" not in output
+
+
+def test_print_result_table_paginated_starts_pager_when_interactive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("agents.common.display._is_interactive", lambda: True)
+    buffer, console = _console()
+    print_result_table_paginated(
+        _many_rows(120),
+        console,
+        page_size=50,
+        input_fn=lambda _: "q",
+    )
+    output = _normalize(buffer.getvalue())
+    assert "50" in output
+    assert "51" not in output
+
+
 def test_build_result_table_page_caption() -> None:
     results = Results(
         columns=["ID"],
