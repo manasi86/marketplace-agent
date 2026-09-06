@@ -1,5 +1,6 @@
 """Runtime context construction shared by every agent."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from langchain_core.language_models import LanguageModelLike
@@ -18,6 +19,7 @@ class AgentContext:
     llm: LanguageModelLike
     connection: OracleConnection
     semantic: SemanticContext
+    input_fn: Callable[[str], str] = input
 
 
 def build_context(settings: Settings | None = None) -> AgentContext:

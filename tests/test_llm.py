@@ -207,3 +207,50 @@ def test_invoke_llm_falls_back_to_configured_model(
         assert generation.updates[0]["usage_details"] is None
     finally:
         get_settings.cache_clear()
+
+
+def test_response_model_falls_back_when_metadata_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from agents.common.llm import _response_model
+
+    class _NonDictMetadata:
+        response_metadata = "unexpected"
+
+    class _NoMetadata:
+        pass
+
+    assert _response_model(_NonDictMetadata(), fallback="fb") == "fb"
+    assert _response_model(_NoMetadata(), fallback="fb") == "fb"
+
+
+def test_usage_details_partial_usage(monkeypatch: pytest.MonkeyPatch) -> None:
+    from agents.common.llm import _usage_details
+
+    class _TotalOnly:
+        usage_metadata: Any = {"total_tokens": 15}
+        content = "x"
+        response_metadata: Any = None
+
+    details = _usage_details(_TotalOnly())
+    assert details == {"total_tokens": 15}
+
+    class _Invalid:
+        usage_metadata: Any = {"total_tokens": "not-a-number"}
+        content = "x"
+        response_metadata: Any = None
+
+    assert _usage_details(_Invalid()) is None
+
+    class _Empty:
+        content = "x"
+        response_metadata: Any = None
+
+    assert _usage_details(_Empty()) is None
+
+    class _NonDict:
+        usage_metadata: Any = "unexpected"
+        content = "x"
+        response_metadata: Any = None
+
+    assert _usage_details(_NonDict()) is None
