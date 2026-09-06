@@ -35,6 +35,8 @@ class Settings(BaseSettings):
 
     # Agent behaviour.
     max_sql_attempts: int = 3
+    results_page_size: int = 50
+    retrieve_answer_max_rows: int = 50
 
     @property
     def has_oracle_credentials(self) -> bool:

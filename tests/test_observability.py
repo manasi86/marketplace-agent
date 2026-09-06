@@ -7,7 +7,13 @@ import pytest
 
 from agents.common import observability
 from agents.common.config import Settings, get_settings
-from agents.common.observability import _ensure_env, observe_run, observe_step, tracing_configured
+from agents.common.observability import (
+    _ensure_env,
+    observe_generation,
+    observe_run,
+    observe_step,
+    tracing_configured,
+)
 
 
 def _add(a: int, b: int) -> int:
@@ -98,3 +104,55 @@ def test_ensure_env_keeps_existing_values(monkeypatch: pytest.MonkeyPatch) -> No
     _ensure_env(settings)
     assert os.environ["LANGFUSE_PUBLIC_KEY"] == "pk-test"
     assert os.environ["LANGFUSE_ENABLED"] == "false"
+
+
+def test_observe_generation_noop_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    def unexpected_client() -> Any:
+        raise AssertionError("langfuse client must not be created when disabled")
+
+    monkeypatch.setattr(observability, "langfuse_get_client", unexpected_client)
+    get_settings.cache_clear()
+    try:
+        with observe_generation("llm_call", "a prompt") as generation:
+            generation.update(model="gpt-4o", usage_details={"prompt_tokens": 1})
+    finally:
+        get_settings.cache_clear()
+
+
+def test_observe_generation_enabled_uses_generation_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorded: list[tuple[str, str, str]] = []
+
+    class _FakeGeneration:
+        def update(self, **_: Any) -> None:
+            return None
+
+        def __enter__(self) -> "_FakeGeneration":
+            return self
+
+        def __exit__(self, *exc: Any) -> None:
+            return None
+
+    class _Fake:
+        def start_as_current_observation(self, **kwargs: Any) -> _FakeGeneration:
+            recorded.append(
+                (
+                    str(kwargs.get("name")),
+                    str(kwargs.get("as_type")),
+                    str(kwargs.get("input")),
+                )
+            )
+            return _FakeGeneration()
+
+    def fake_client() -> Any:
+        return _Fake()
+
+    monkeypatch.setattr(observability, "langfuse_get_client", fake_client)
+    _enable_langfuse_env(monkeypatch)
+    try:
+        with observe_generation("llm_call", "classify me") as generation:
+            generation.update(model="gpt-4o", usage_details={"prompt_tokens": 3})
+        assert recorded == [("llm_call", "generation", "classify me")]
+    finally:
+        get_settings.cache_clear()

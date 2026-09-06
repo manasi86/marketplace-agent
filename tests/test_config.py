@@ -22,10 +22,14 @@ class TestSettings:
             langfuse_secret_key="",
             langfuse_enabled=False,
             max_sql_attempts=3,
+            results_page_size=50,
+            retrieve_answer_max_rows=50,
         )
         assert settings.sql_gen_base_url == "https://llm.nalits.com/v1"
         assert settings.sql_gen_model == "gpt-4o"
         assert settings.max_sql_attempts == 3
+        assert settings.results_page_size == 50
+        assert settings.retrieve_answer_max_rows == 50
 
     def test_subclass_of_base_settings(self) -> None:
         assert issubclass(Settings, BaseSettings)
@@ -92,6 +96,8 @@ def _settings(**overrides: str | int | bool) -> Settings:
         "langfuse_secret_key": "",
         "langfuse_enabled": False,
         "max_sql_attempts": 3,
+        "results_page_size": 50,
+        "retrieve_answer_max_rows": 50,
     }
     defaults.update(overrides)
     return Settings.model_validate(defaults)

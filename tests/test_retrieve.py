@@ -111,6 +111,43 @@ def test_run_agent_no_row_no_answer() -> None:
     assert state["answer"] is None
 
 
+def test_run_agent_renders_table_when_result_large() -> None:
+    llm = FakeLLM([GOOD_SQL])
+    context = make_context(
+        settings=_settings(retrieve_answer_max_rows=1),
+        llm=llm,
+        connection=FakeOracle(
+            fetch_schema=SAMPLE_SCHEMA,
+            result=QueryResult(
+                columns=["REGION", "TOTAL"],
+                rows=[[f"Region-{index}", index * 100] for index in range(5)],
+            ),
+        ),
+    )
+    state = run_agent(_QUERY, context)
+    assert state["error"] is None
+    assert len(state["query_rows"] or []) == 5
+    assert state["answer"] is None
+    assert len(llm.prompts) == 1
+
+
+def test_run_agent_answers_english_at_threshold() -> None:
+    llm = FakeLLM([GOOD_SQL, ANSWER])
+    context = make_context(
+        settings=_settings(retrieve_answer_max_rows=1),
+        llm=llm,
+        connection=FakeOracle(
+            fetch_schema=SAMPLE_SCHEMA,
+            result=QueryResult(columns=["REGION"], rows=[["West", 100]]),
+        ),
+    )
+    state = run_agent(_QUERY, context)
+    assert state["error"] is None
+    assert state["query_rows"] == [["West", 100]]
+    assert state["answer"] == ANSWER
+    assert len(llm.prompts) == 2
+
+
 def test_route_retrieve_returns_factual_data() -> None:
     state = route(AgentCategory.RETRIEVE, _QUERY, _context())
     assert state["error"] is None
