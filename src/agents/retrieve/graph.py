@@ -11,6 +11,7 @@ from typing import Any
 
 from agents.common.context import AgentContext
 from agents.common.llm import LLMError, invoke_llm
+from agents.common.observability import observe_run
 from agents.retrieve.prompts import answer_prompt
 from agents.sql_generator.graph import build_graph
 from agents.sql_generator.graph import run_agent as run_pipeline
@@ -19,17 +20,30 @@ from agents.sql_generator.state import SqlGeneratorState
 logger = logging.getLogger(__name__)
 
 
+@observe_run("retrieve_agent")
 def run_agent(user_query: str, context: AgentContext) -> SqlGeneratorState:
-    """Run the SQL pipeline, then answer the question in plain English."""
+    """Run the SQL pipeline, then answer in English or show a result table.
+
+    Small result sets (at most ``retrieve_answer_max_rows`` rows) are phrased
+    as an English answer. Larger results skip the summarization LLM call and
+    leave the answer unset so the CLI renders the returned data as a table.
+    """
     result = run_pipeline(user_query, context)
     rows = result.get("query_rows")
     if result.get("error") is None and rows:
-        result["answer"] = _generate_answer(
-            context,
-            user_query,
-            result.get("query_columns") or [],
-            rows,
-        )
+        if len(rows) <= context.settings.retrieve_answer_max_rows:
+            result["answer"] = _generate_answer(
+                context,
+                user_query,
+                result.get("query_columns") or [],
+                rows,
+            )
+        else:
+            logger.info(
+                "Query returned %d rows; rendering as a table (exceeds %d-row English threshold).",
+                len(rows),
+                context.settings.retrieve_answer_max_rows,
+            )
     return result
 
 

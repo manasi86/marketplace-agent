@@ -1,13 +1,15 @@
 """Langfuse observability integration shared by every agent."""
 
 from collections.abc import Callable
+from contextlib import nullcontext
 import functools
 import logging
 import os
 from time import perf_counter
-from typing import Literal, ParamSpec, TypeVar
+from typing import Any, Literal, ParamSpec, TypeVar
 
 from dotenv import load_dotenv
+from langfuse import get_client as langfuse_get_client
 from langfuse import observe as langfuse_observe
 
 from agents.common.config import Settings, get_settings
@@ -55,6 +57,31 @@ def observe_step(name: str) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
 def observe_run(name: str) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     """Return a decorator that traces the whole agent run as a root call."""
     return _trace_wrapper(name, as_type="chain")
+
+
+class _NoopObservation:
+    """Absorbs observation updates when Langfuse tracing is disabled."""
+
+    def update(self, **_: Any) -> None:
+        return None
+
+
+def observe_generation(name: str, input_value: Any) -> Any:
+    """Return a Langfuse generation context manager for an LLM call.
+
+    When tracing is disabled this returns a no-op context whose ``update``
+    calls are absorbed, so callers do not need to branch. When enabled the
+    generation nests under the current span/chain and carries the input.
+    """
+    settings = get_settings()
+    if not _tracing_enabled(settings):
+        return nullcontext(_NoopObservation())
+    _ensure_env(settings)
+    return langfuse_get_client().start_as_current_observation(
+        name=name,
+        as_type="generation",
+        input=input_value,
+    )
 
 
 def tracing_configured() -> bool:

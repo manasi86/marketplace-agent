@@ -3,15 +3,18 @@
 import io
 from typing import Any, cast
 
+import pytest
 from rich.console import Console
 
 from agents.common.display import (
     Results,
+    _run_pager,
     build_answer_panel,
     build_failure_panel,
     build_log_panels,
     build_result_table,
     print_agent_output,
+    print_result_table_paginated,
 )
 from agents.sql_generator.display import NODE_TITLES as SQL_NODE_TITLES
 from agents.sql_generator.display import build_results
@@ -213,3 +216,104 @@ def test_sql_print_agent_output_no_result() -> None:
     buffer, console = _console()
     sql_print(state, console)
     assert "without producing a result" in buffer.getvalue()
+
+
+def _many_rows(count: int) -> Results:
+    return Results(
+        columns=["ID"],
+        rows=[[str(index)] for index in range(1, count + 1)],
+        execution_time_ms=5.0,
+        attempt_count=1,
+        sql_query="SELECT id FROM SALES.VW_SALES_SUMMARY",
+    )
+
+
+def _normalize(text: str) -> str:
+    """Flatten whitespace/newlines so Rich-wrapped captions match literally."""
+    return " ".join(text.split())
+
+
+def test_non_interactive_large_result_prints_first_page_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("agents.common.display._is_interactive", lambda: False)
+    buffer, console = _console()
+    print_result_table_paginated(
+        _many_rows(120),
+        console,
+        page_size=50,
+    )
+    output = _normalize(buffer.getvalue())
+    assert "50" in output
+    assert "51" not in output
+    assert "of 120" in output
+
+
+def test_non_interactive_large_result_does_not_show_last_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("agents.common.display._is_interactive", lambda: False)
+    buffer, console = _console()
+    print_result_table_paginated(_many_rows(120), console, page_size=50)
+    assert "101" not in _normalize(buffer.getvalue())
+
+
+def test_non_interactive_small_result_prints_all_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("agents.common.display._is_interactive", lambda: True)
+    buffer, console = _console()
+    print_result_table_paginated(_many_rows(3), console, page_size=50, input_fn=lambda _: "q")
+    assert "of 3" in _normalize(buffer.getvalue())
+    assert "3" in _normalize(buffer.getvalue())
+
+
+def test_pager_next_and_quit() -> None:
+    buffer, console = _console()
+    commands = iter(["n", "q"])
+    _run_pager(_many_rows(120), console, 50, input_fn=lambda _: next(commands))
+    output = _normalize(buffer.getvalue())
+    assert "51" in output
+    assert "100" in output
+    assert "101" not in output
+
+
+def test_pager_prev_and_jump() -> None:
+    buffer, console = _console()
+    commands = iter(["j 3", "p", "q"])
+    _run_pager(_many_rows(120), console, 50, input_fn=lambda _: next(commands))
+    output = _normalize(buffer.getvalue())
+    assert "101" in output
+    assert "119" in output
+    assert "51" in output
+    assert "100" in output
+
+
+def test_pager_jump_out_of_range_keeps_page() -> None:
+    buffer, console = _console()
+    commands = iter(["j 99", "q"])
+    _run_pager(_many_rows(120), console, 50, input_fn=lambda _: next(commands))
+    output = _normalize(buffer.getvalue())
+    assert "50" in output
+    assert "51" not in output
+
+
+def test_pager_eof_returns() -> None:
+    buffer, console = _console()
+
+    def raise_eof(_: str) -> str:
+        raise EOFError
+
+    _run_pager(_many_rows(120), console, 50, input_fn=raise_eof)
+    assert "50" in _normalize(buffer.getvalue())
+    assert "51" not in _normalize(buffer.getvalue())
+
+
+def test_build_result_table_page_caption() -> None:
+    results = Results(
+        columns=["ID"],
+        rows=[["1"], ["2"]],
+        execution_time_ms=5.0,
+        attempt_count=0,
+        sql_query="",
+    )
+    caption = str(build_result_table(results, page_start=51, total_rows=120).caption or "")
+    assert "showing rows 51-52 of 120" in caption
